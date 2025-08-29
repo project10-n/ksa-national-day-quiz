@@ -1,0 +1,365 @@
+<div dir="rtl" lang="ar">
+<style>
+/* ——— الخطوط ——— */
+@font-face{
+  font-family:'Saudi';
+  src:url('/wp-content/uploads/2025/08/Saudi-Regular1.ttf') format('truetype');
+  font-weight:400; font-style:normal; font-display:swap;
+}
+@font-face{
+  font-family:'Saudi';
+  src:url('/wp-content/uploads/2025/08/Saudi-Bold2.ttf') format('truetype');
+  font-weight:700; font-style:normal; font-display:swap;
+}
+*,*::before,*::after{ box-sizing:border-box }
+:where(html, body, .wrap, #sa-map *, #map-note, #quiz-box, #quiz-box *){
+  font-family:'Saudi', Tahoma, Arial, sans-serif !important;
+}
+body{ margin:0; background:#003D42; color:#0f172a }
+
+/* زخرفة أعلى/أسفل (كما هي) */
+.pattern{ width:100%; height:60px; background:url('http://ksa-national-day-quiz.local/wp-content/uploads/2025/08/Screenshot-2025-08-22-004929.png') repeat-x center / auto 100%; display:block; line-height:0; margin:0 !important; }
+
+/* الحاوية */
+.wrap{ padding:0 min(3vw,28px) min(3vw,28px); min-height:calc(100vh - 120px); background:#003D42; display:flex; flex-direction:column; align-items:center; }
+.logo{ display:block; width:clamp(280px,36vw,460px); height:auto; margin:-70px auto -20px !important; filter:drop-shadow(0 6px 14px rgba(0,0,0,.22)); }
+
+/* ملاحظة أعلى الخريطة */
+#map-note{
+  display:inline-block; border:1px solid #e5e7eb; border-radius:12px;
+  padding:.6rem .75rem; background:#fff; color:#111827; font-size:15px;
+  max-width:min(100%,1100px); margin-bottom:12px;
+}
+
+/* ——— خريطة بدون إطار ——— */
+#sa-map{
+  /* إصلاح: إزالة الإطار نهائيًا */
+  background:transparent !important;
+  padding:0 !important;
+  border-radius:0 !important;
+  box-shadow:none !important;
+  width:100%; max-width:1100px; overflow:visible; touch-action:manipulation; user-select:none;
+}
+
+/* SVG مرن */
+#sa-map svg{ width:100% !important; height:auto !important; background:transparent !important; }
+
+/* تسميات المناطق */
+#sa-map svg text.region-label{
+  fill:#000; font-weight:700; pointer-events:none; text-rendering:geometricPrecision;
+  -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+}
+
+/* انتقال ناعم */
+#sa-map svg path{ transition:fill .2s ease, stroke .2s ease, filter .15s ease; }
+
+/* حدود واضحة + ظل على الحدود نفسها */
+#sa-map svg path{
+  /* إصلاح: لون افتراضي أبيض وحدود ثابتة لا تتأثر بالتكبير */
+  fill:#ffffff;
+  stroke:#2b3a3a;
+  stroke-width:0.9;
+  vector-effect:non-scaling-stroke; /* تثبيت سماكة الحد */
+  filter:drop-shadow(0 1px 1px rgba(0,0,0,.35)); /* ظل يتبع شكل المنطقة */
+}
+
+@media (max-width:640px){
+  #map-note{ font-size:14px; padding:.55rem .7rem }
+}
+</style>
+
+<!-- زخرفة علوية -->
+<div class="pattern" aria-hidden="true"></div>
+
+<div class="wrap">
+  <img class="logo" src="http://ksa-national-day-quiz.local/wp-content/uploads/2025/08/لوقو-يوم-الوطني-95-scaled.png" alt="شعار اليوم الوطني 95">
+  <div id="map-note">اختر أي منطقة على الخريطة لعرض السؤال.</div>
+  <div id="sa-map"></div>
+</div>
+
+<!-- زخرفة سفلية -->
+<div class="pattern" aria-hidden="true"></div>
+
+
+
+<script>
+(async () => {
+  // تحميل الـ SVG
+  const res       = await fetch('/wp-content/uploads/2025/08/sa.svg');
+  const svgText   = await res.text();
+  const container = document.getElementById('sa-map');
+  container.innerHTML = svgText;
+
+  const svg = container.querySelector('svg');
+  if (!svg) return;
+
+  // تجاوب
+  svg.style.width='100%';
+  svg.style.height='auto';
+  svg.style.background='transparent';
+  svg.setAttribute('preserveAspectRatio','xMidYMid meet');
+
+  // إزالة أي خلفية داخل ملف SVG
+  svg.querySelectorAll('rect').forEach(r=>{ r.setAttribute('fill','transparent'); r.setAttribute('stroke','none'); });
+
+  const note = document.getElementById('map-note');
+
+  // وضع الاختبار عبر ?ndqTest=1
+  const isTest = new URLSearchParams(location.search).has('ndqTest');
+
+  // قاموس التسميات
+  const arabicLabels = {
+    'Ar Riyad':'الرياض','Makkah':'مكة المكرمة','`Asir':'عسير','Jizan':'جازان','Najran':'نجران',
+    'Al Madinah':'المدينة المنورة','Al Quassim':'القصيم','Tabuk':'تبوك','Al Hudud ash Shamaliyah':'الحدود الشمالية',
+    'Ash Sharqiyah':'الشرقية','Al Jawf':'الجوف',"Ha'il":'حائل','Al Bahah':'الباحة'
+  };
+
+  // تعديلات مواضع تسميات
+  const labelAdjust = {
+    'Al Quassim':{sizeAdd:8}, 'Ar Riyad':{sizeAdd:8}, 'Ash Sharqiyah':{sizeAdd:2},
+    'Makkah':{sizeAdd:8}, 'Al Madinah':{sizeAdd:5}, 'Najran':{sizeAdd:8}, '`Asir':{sizeAdd:8},
+    "Ha'il":{sizeAdd:4}, 'Al Bahah':{sizeAdd:4}, 'Tabuk':{sizeAdd:4, dy:-60},
+    'Al Hudud ash Shamaliyah':{dy:-35, rotate:-320}, 'Jizan':{sizeAdd:4, dy:-10, rotate:-350}
+  };
+
+  // أسئلة
+  const regionQuiz = {
+    'Ar Riyad': { q:'ما هي عاصمة المملكة العربية السعودية؟', choices:['مكة المكرمة','الرياض','جدة','المدينة المنورة'], correct:1 },
+    'Makkah': { q:'يوجد في مكة أقدس مسجد في الإسلام وهو:', choices:['المسجد الحرام','المسجد النبوي','المسجد الأقصى','مسجد قباء'], correct:0 },
+    '`Asir': { q:'تقع منطقة عسير في أي جهة من المملكة؟', choices:['الشمال','الجنوب الغربي','الشرق','الوسط'], correct:1 },
+    'Jizan': { q:'جازان تشتهر بجزرها ومن أشهرها:', choices:['فرسان','أبو علي','تاروت','السافلين'], correct:0 },
+    'Najran': { q:'نجران تقع على حدود المملكة مع:', choices:['الأردن','الإمارات','اليمن','الكويت'], correct:2 },
+    'Al Madinah': { q:'المسجد النبوي يقع في:', choices:['الرياض','جدة','المدينة المنورة','الدمام'], correct:2 },
+    'Al Quassim': { q:'تشتهر القصيم بزراعة:', choices:['القمح','التمر','الأرز','القطن'], correct:1 },
+    'Tabuk': { q:'مدينة نيوم تقع إدارياً ضمن منطقة:', choices:['تبوك','حائل','الشرقية','الجوف'], correct:0 },
+    'Al Hudud ash Shamaliyah': { q:'تقع الحدود الشمالية في أقصى:', choices:['الشرق','الغرب','الشمال','الجنوب'], correct:2 },
+    'Ash Sharqiyah': { q:'أكبر مناطق المملكة مساحة هي:', choices:['الشرقية','الرياض','مكة','عسير'], correct:0 },
+    'Al Jawf': { q:'من واحات الشمال الشهيرة في الجوف:', choices:['دومة الجندل','الطائف','سكاكا','ينبع'], correct:0 },
+    "Ha'il": { q:'يشتهر تراث حائل بمسابقة:', choices:['الهجن','الخيل','التجديف','الغوص'], correct:0 },
+    'Al Bahah': { q:'قرية ذي عين الأثرية تقع في:', choices:['الطائف','الباحة','الرياض','جازان'], correct:1 }
+  };
+
+  // ألوان
+  const HOVER_FILL  = '#d1d5db';
+  const RIGHT_COLOR = '#16a34a';
+  const WRONG_COLOR = '#dc2626';
+
+  // حالة اختيار/قفل
+  let picked = false;
+  let pickedRegionKey = null;
+  let hardLocked = false;
+
+  // مساعدات
+  const group = container.querySelector('#features') || container;
+  const paths = group.querySelectorAll('path');
+
+  // فرض الأبيض والحدود والظل (لتأمين النقر)
+  paths.forEach(p=>{
+    p.setAttribute('fill','#ffffff');
+    p.setAttribute('stroke','#2b3a3a');
+    p.setAttribute('stroke-width','0.9');
+    p.setAttribute('vector-effect','non-scaling-stroke');
+    p.style.filter='drop-shadow(0 1px 1px rgba(0,0,0,.35))';
+  });
+
+  // تلوين كل الخريطة
+  function paintAll(color){
+    paths.forEach(p=>{ p.style.fill=color; p.setAttribute('fill',color); });
+  }
+
+  // قفل نهائي
+  function lockAll(){
+    hardLocked = true;
+    paths.forEach(p=>{ p.style.pointerEvents='none'; p.style.cursor='default'; });
+    try{ localStorage.setItem('ndq-answered-once','1'); }catch(_){}
+  }
+
+  // استعادة الحالة الأخيرة (لون + رسالة) إن وُجدت
+  try{
+    if (localStorage.getItem('ndq-answered-once') === '1'){
+      const savedColor = localStorage.getItem('ndq-result-color');
+      const savedNote  = localStorage.getItem('ndq-finish-note');
+      if (savedColor) paintAll(savedColor);
+      lockAll();
+      note.innerHTML = savedNote || `
+        <div style="font-weight:700;margin-bottom:6px">تم تسجيل مشاركتك مسبقًا ✅</div>
+        <div>شكرًا لتفاعلك! تابع إعلان الفائزين عبر عمادة شؤون الطلاب.</div>
+      `;
+    } else {
+      note.textContent = 'اختر أي منطقة على الخريطة لعرض السؤال.';
+    }
+  }catch(_){ note.textContent = 'اختر أي منطقة على الخريطة لعرض السؤال.'; }
+
+  // طبقة تسميات
+  const labelLayer = document.createElementNS('http://www.w3.org/2000/svg','g');
+  svg.appendChild(labelLayer);
+
+  // دالة استخراج مفتاح المنطقة من خصائص متعددة (لتفادي فقدان النقر)
+  const getKey = el => (el.getAttribute('name') || el.getAttribute('data-name') || el.getAttribute('data-title') || el.id || '').trim();
+
+  // ربط التفاعلات
+  paths.forEach(p=>{
+    const key = getKey(p);
+    if(!key) return;
+
+    // إنشاء التسمية
+    const box = p.getBBox(), cx=box.x+box.width/2, cy=box.y+box.height/2;
+    const adj = labelAdjust[key]||{};
+    const label = document.createElementNS('http://www.w3.org/2000/svg','text');
+    label.setAttribute('class','region-label');
+    label.setAttribute('text-anchor','middle');
+    label.setAttribute('dominant-baseline','middle');
+    label.setAttribute('x', cx+(adj.dx||0));
+    label.setAttribute('y', cy+(adj.dy||0));
+    const autoSize=Math.max(10,Math.min(18,box.width/18));
+    label.style.fontSize=(autoSize+(adj.sizeAdd||0))+'px';
+    if(typeof adj.rotate==='number'){
+      label.setAttribute('transform',`rotate(${adj.rotate},${cx+(adj.dx||0)},${cy+(adj.dy||0)})`);
+    }
+    label.textContent = arabicLabels[key] || key;
+
+    // إصلاح العربية على iOS: اتجاه/باي-دايركشن/ليجيتشرز + fallback عربي
+    label.setAttribute('direction','rtl');
+    label.setAttribute('xml:lang','ar');
+    label.setAttribute('lang','ar');
+    label.style.direction = 'rtl';
+    label.style.unicodeBidi = 'plaintext';   // أو 'isolate' حسب الحاجة
+    label.style.fontVariantLigatures = 'contextual common-ligatures';
+    label.style.fontFeatureSettings = "'liga' 1, 'calt' 1, 'rlig' 1";
+    label.style.fontFamily = "Saudi, 'SF Arabic', 'Geeza Pro', Tahoma, Arial, sans-serif";
+    label.style.letterSpacing = '0';
+    label.style.wordSpacing = '0';
+    // منع أي حدود للنص
+    label.setAttribute('stroke','none');
+    label.style.stroke='none';
+    label.style.webkitTextStroke='0';
+    label.style.textShadow='none';
+    label.style.paintOrder='fill';
+    // لا تتلقى لمس/نقر
+    label.style.pointerEvents='none';
+
+    labelLayer.appendChild(label);
+
+    // إبراز عند المرور
+    let beforeHover = p.style.fill || p.getAttribute('fill') || '#ffffff';
+
+    p.addEventListener('pointerenter', ()=>{
+      if (hardLocked || (picked && key!==pickedRegionKey)) { p.style.cursor='default'; return; }
+      beforeHover = p.style.fill || p.getAttribute('fill') || '#ffffff';
+      p.style.fill = HOVER_FILL;
+      p.style.stroke = '#0f172a';
+      p.style.filter = 'drop-shadow(0 2px 3px rgba(0,0,0,.45))';
+      p.style.cursor = 'pointer';
+      if (p.parentNode) p.parentNode.appendChild(p);
+    });
+
+    p.addEventListener('pointerleave', ()=>{
+      if (hardLocked || (picked && key!==pickedRegionKey)) return;
+      p.style.fill = beforeHover;
+      p.style.stroke = '#2b3a3a';
+      p.style.filter = 'drop-shadow(0 1px 1px rgba(0,0,0,.35))';
+    });
+
+    // مفعّل لكل من click + pointerup + touchend (أضمن للجوال)
+    const activate = (evt)=>{
+      if (hardLocked) return;
+      if (picked && key !== pickedRegionKey) return;
+
+      if (!picked){
+        picked = true;
+        pickedRegionKey = key;
+        paths.forEach(other=>{
+          if (other !== p){
+            other.style.pointerEvents='none';
+            other.style.cursor='default';
+          }
+        });
+      }
+      openQuiz(key);
+      if (evt) evt.preventDefault();
+    };
+
+    p.addEventListener('click', activate);
+    p.addEventListener('pointerup', activate);
+    p.addEventListener('touchend', activate, {passive:false});
+  });
+
+  // واجهة السؤال + حفظ النتيجة + قفل نهائي
+  function openQuiz(regionKey){
+    const data = regionQuiz[regionKey];
+    const nice = arabicLabels[regionKey] || regionKey;
+    if (!data){ note.textContent = `لا يوجد سؤال لهذه المنطقة: ${nice}`; return; }
+
+    let selectedIndex = null;
+
+    note.innerHTML = `
+      <div class="q-wrap" style="display:flex;flex-direction:column;gap:10px">
+        <div class="q-text" style="font-weight:700">${nice}: ${data.q}</div>
+        <div id="choices" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center"></div>
+        <button id="submitAns" type="button"
+          style="align-self:center;padding:8px 14px;border:none;border-radius:10px;background:#008847;color:#fff;font-weight:700;cursor:pointer">
+          إرسال الإجابة
+        </button>
+      </div>
+    `;
+
+    const choicesWrap = note.querySelector('#choices');
+    const submitBtn   = note.querySelector('#submitAns');
+
+    data.choices.forEach((text,i)=>{
+      const btn = document.createElement('button');
+      btn.type='button'; btn.textContent=text;
+      btn.style.cssText=`padding:10px 14px;border:2px solid #e5e7eb;border-radius:999px;background:#fff;cursor:pointer;transition:box-shadow .15s,border-color .15s,transform .05s`;
+      btn.addEventListener('click', ()=>{
+        [...choicesWrap.children].forEach(b=>{ b.style.borderColor='#e5e7eb'; b.style.boxShadow='none'; b.style.transform='none'; });
+        btn.style.borderColor='#008847';
+        btn.style.boxShadow='0 0 0 4px rgba(0,136,71,.18)';
+        btn.style.transform='translateY(-1px)';
+        selectedIndex = i;
+      });
+      choicesWrap.appendChild(btn);
+    });
+
+    submitBtn.addEventListener('click', ()=>{
+      if (selectedIndex === null){
+        note.querySelector('.q-text').textContent = 'اختر إجابة أولاً ثم اضغط إرسال.';
+        return;
+      }
+      const ok = (selectedIndex === data.correct);
+      const resultColor = ok ? RIGHT_COLOR : WRONG_COLOR;
+
+      paintAll(resultColor);
+
+      const finishHTML = `
+        <div style="font-weight:800;margin-bottom:6px">عزّنا بطبعنا ✅</div>
+        <div style="color:#0f172a;line-height:1.7">شكرًا لمشاركتك في مسابقة اليوم الوطني 95 🎉</div>
+        <div style="color:#0f172a;line-height:1.7">ترقّب إعلان الفائزين عبر القنوات الرسمية.</div>
+      `;
+
+      try{
+        localStorage.setItem('ndq-answered-once','1');
+        localStorage.setItem('ndq-result-color', resultColor);
+        localStorage.setItem('ndq-finish-note', finishHTML);
+      }catch(_){}
+
+      lockAll();
+      note.innerHTML = finishHTML;
+    }, { once:true });
+  }
+
+  // زر إعادة التجربة في وضع الاختبار
+  if (isTest){
+    const resetBtn = document.createElement('button');
+    resetBtn.textContent = 'إعادة التجربة';
+    resetBtn.style.cssText = 'position:fixed;right:12px;bottom:12px;z-index:9999;background:#111827;color:#fff;padding:8px 12px;border:none;border-radius:10px;font-weight:700;box-shadow:0 6px 14px rgba(0,0,0,.2);';
+    resetBtn.addEventListener('click', ()=>{
+      ['ndq-answered-once','ndq-result-color','ndq-finish-note'].forEach(k=>localStorage.removeItem(k));
+      hardLocked=false; picked=false; pickedRegionKey=null;
+      location.reload();
+    });
+    document.body.appendChild(resetBtn);
+  }
+})();
+</script>
+
+</div>
